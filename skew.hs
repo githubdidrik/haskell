@@ -1,72 +1,4 @@
 
-import Control.Applicative
-import System.Environment
-import System.IO
--- | Bids.
-
-data Bid
-  = Buy Person Price           -- Person offers to buy share
-  | Sell Person Price          -- Person offers to sell share
-  | NewBuy Person Price Price  -- Person changes buy bid
-  | NewSell Person Price Price -- Person changes sell bid
-
-type Person = String
-type Price = Integer
-
--- | Parses a bid. Incorrectly formatted bids are returned verbatim
--- (tagged with 'Left').
-
-parseBid :: String -> Either String Bid
-parseBid s = case words s of
-  name : kind : prices ->
-    case (kind, mapM readInteger prices) of
-      ("K",  Just [price])              -> Right (Buy name price)
-      ("S",  Just [price])              -> Right (Sell name price)
-      ("NK", Just [oldPrice, newPrice]) -> Right (NewBuy name oldPrice newPrice)
-      ("NS", Just [oldPrice, newPrice]) -> Right (NewSell name oldPrice newPrice)
-      _ -> Left s
-  _ -> Left s
-  where
-  readInteger :: String -> Maybe Integer
-  readInteger s = case filter (null . snd) $ reads s of
-    [(x, _)] -> Just x
-    _        -> Nothing
-
--- | Parses a sequence of bids. Correctly formatted bids are returned
--- (in the order encountered), and an error message is printed for
--- each incorrectly formatted bid.
-
-parseBids :: String -> IO [Bid]
-parseBids s = concat <$> mapM (check . parseBid) (lines s)
-  where
-  check (Left bid)  = do
-    hPutStrLn stderr $ "Malformed bid: " ++ bid
-    return []
-  check (Right bid) = return [bid]
-
--- | The main function of the program.
-
-main :: IO ()
-main = do
-  args <- getArgs
-  case args of
-    []  -> process stdin
-    [f] -> process =<< openFile f ReadMode
-    _   -> hPutStr stderr $ unlines
-      [ "Usage: ./Lab2 [<file>]"
-      , "If no file is given, then input is read from standard input."
-      ]
-  where
-  process h = tradeMain =<< parseBids =<< hGetContents h
-
--- | The core of the program. Takes a list of bids and executes them.
-
-tradeMain :: [Bid] -> IO ()
-tradeMain bids = trade emptyOrderBook bids 
-
-emptyOrderBook :: OrderBook
-emptyOrderBook = (Empty, Empty)
-
 
 data SkewHeap a = Empty | Node (SkewHeap a) a (SkewHeap a) deriving (Show)
 
@@ -84,7 +16,7 @@ merge h1@(Node a1 x1 b1) h2@(Node a2 x2 b2)
     |otherwise  = Node (merge h1 b2) x2 a2
 
 root :: SkewHeap a -> Maybe a
-root Empty = Nothing
+root Empty = Nothing 
 root (Node _ a _) = Just a
 
 insert :: Ord a => a -> SkewHeap a -> SkewHeap a
@@ -109,6 +41,16 @@ instance Show Bid where
     show (Buy person price) = person ++ " " ++ show price
     show (Sell person price) = person ++ " " ++ show price
 
+data Bid
+  = Buy Person Price           -- Person offers to buy share
+  | Sell Person Price          -- Person offers to sell share
+  | NewBuy Person Price Price  -- Person changes buy bid
+  | NewSell Person Price Price -- Person changes sell bid
+
+
+type Person = String
+type Price = Integer
+
 instance Ord Bid where
     (Buy _ p1) <= (Buy _ p2) = p1 <= p2
     (Sell _ p1) <= (Sell _ p2) = p1 >= p2
@@ -131,16 +73,18 @@ deleteBid s@(Sell _ _) (buyheap, sellheap) = (buyheap, delete s sellheap)
 
 trade :: OrderBook -> [Bid] -> IO()
 trade orderBook [] = do
-    putStrLn "Orderbok:"
-    putStrLn $ "Säljare: " ++ toString (snd orderBook)
-    putStrLn $ "Köpare: " ++ toString (fst orderBook)
+    let (buyHeap, sellHeap) = orderBook
+    putStrLn "Final status of orderbook:"
+    putStrLn $ "Buyers: " ++ toString buyHeap
+    putStrLn $ "Sellers: " ++ toString sellHeap
 trade orderBook (bid : rest) = do
     newOrderBook@(buyHeap, sellHeap) <- execute bid orderBook
-    putStrLn "Orderbok:"
-    putStrLn $ "Säljare: " ++ toString sellHeap
-    putStrLn $ "Köpare: " ++ toString buyHeap
+    putStrLn "Currrent status of orderbook:"
+    putStrLn $ "Buyers: " ++ toString buyHeap
+    putStrLn $ "Sellers: " ++ toString sellHeap
+    putStrLn ""
     trade (deleteBid bid newOrderBook) rest
-
+          
 
 execute :: Bid -> OrderBook -> IO OrderBook
 execute bid book@(buybids, sellbids) = case bid of
@@ -167,18 +111,23 @@ execute bid book@(buybids, sellbids) = case bid of
             newBuybid = Buy person newPrice
         in return (insert newBuybid newBuybids, sellbids)
 
-    (NewSell person oldPrice newPrice) ->
+    (NewSell person oldPrice newPrice) -> 
         let newSellbids = delete (Sell person oldPrice) sellbids
             newSellbid = Sell person newPrice
         in return (buybids, insert newSellbid newSellbids)
 
 
-
+        
 
 doTrade :: Bid -> Bid -> IO()
 doTrade b@(Buy buyer p) s@(Sell seller _) = do
     putStrLn $ buyer ++ " buys a share from " ++ seller ++ " for " ++ show p
 
+
+main :: IO ()
+main = do 
+    trade book bids
+    putStrLn "Trading completed."
 
 
 h1 :: SkewHeap Bid -- buybid/decending
