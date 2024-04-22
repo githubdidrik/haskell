@@ -32,4 +32,5 @@ main = do
     let timeLimit = 100000
     putStrLn "Ratios:"
     mapM_ (\rs -> putStrLn (unwords (map show rs))) (map ratio ns)
+    mapM_ (\rs -> putStrLn (unwords (map show rs))) (ns)
   
