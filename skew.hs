@@ -7,6 +7,9 @@ module Skew
   , insert
   , delete
   , toString
+  ,invariant
+  ,prop_invariant
+  ,fromList
   ) where
 
 data SkewHeap a = Empty | Node (SkewHeap a) a (SkewHeap a) deriving (Show)
@@ -40,11 +43,7 @@ delete x (Node l y r)
 toString :: (Show a, Ord a) => SkewHeap a -> String
 toString Empty                 = ""
 toString (Node Empty a Empty)  = show a ++ ", "
-toString (Node l a Empty)  = show a ++ ", " ++ toString l
-toString (Node Empty a r)  = show a ++ ", " ++ toString r
-toString (Node l a r)
-    | root l <= root r   = show a ++ ", " ++ toString r ++ toString l
-    | otherwise          = show a ++ ", " ++ toString l ++ toString r
+toString (Node l a r) = show a ++ ", " ++ toString (merge l r)
 
 invariant :: Ord a => SkewHeap a -> Bool
 invariant Empty                = True

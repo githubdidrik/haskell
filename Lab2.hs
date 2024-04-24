@@ -90,6 +90,9 @@ instance Show Bid where
 instance Ord Bid where
     (Buy _ p1)  <= (Buy _ p2) = p1 <= p2
     (Sell _ p1) <= (Sell _ p2) = p1 >= p2
+    (Buy _ p1) <= (Sell _ p2) = p1 >= p2
+    (Sell _ p1) <= (Buy _ p2) = p1 <= p2
+
 
 instance Eq Bid where
     (Buy _ p1)       == (Buy _ p2)       = p1 == p2
@@ -105,15 +108,52 @@ trade orderBook [] = do
     putStrLn $ "Säljare: " ++ toString (snd orderBook)
     putStrLn $ "Köpare: " ++ toString (fst orderBook)
 trade orderBook (bid : rest) = do
-    newOrderBook@(buyHeap, sellHeap) <- execute bid orderBook
+    newOrderBook@(buyHeap, sellHeap) <- execute1 bid orderBook
     trade newOrderBook rest
- 
+
+
+execute1 :: Bid -> OrderBook -> IO OrderBook
+execute1 bid book = case bid of
+    (Buy p pr) -> doBuyBid bid book
+    (Sell p pr) -> doSellBid bid book
+    (NewBuy p old new) -> doNewBuyBid bid book
+    (NewSell p old new) -> doNewBuyBid bid book
+
+
+doBuyBid :: Bid -> OrderBook -> IO OrderBook
+doBuyBid buybid book = 
+    if buybid <= lowestsellbid
+    then return (deleteBid lowestsellbid book)
+    else return (addBid buybid book)
+        where
+            lowestsellbid = case root (snd book) of 
+                Just bid -> bid
+                _ -> Sell "FEL!!!" 100
+
+doSellBid :: Bid -> OrderBook -> IO OrderBook
+doSellBid sellbid book =
+    if sellbid <= highestbuybid
+    then return (deleteBid highestbuybid book)
+    else return (addBid sellbid book)
+        where
+            highestbuybid = case root (fst book) of 
+                Just bid -> bid
+                _ -> Buy "FEL!!!" 100
+
+doNewBuyBid :: Bid -> OrderBook -> IO OrderBook
+doNewBuyBid (NewBuy person old new) book =
+    return (addBid (Buy person new) deleteBid (Buy person old))
+
+doNewSellBid :: Bid -> OrderBook -> IO OrderBook
+doNewSellBid (NewSell person old new) book =
+    return (addBid (Sell person new) (deleteBid (Sell person old)))
+
 
 execute :: Bid -> OrderBook -> IO OrderBook
 execute bid book@(Empty, Empty)    = return (addBid bid book)
 
 execute bid book@(Empty, sellbids) = case bid of
-    (Buy p price)  -> case root sellbids of 
+    (Buy p price)  -> case root sellbids of
         Just (Sell p askingPrice) -> if price >= askingPrice
             then do
                 doTrade bid (Sell p askingPrice)
@@ -124,13 +164,13 @@ execute bid book@(Empty, sellbids) = case bid of
 
     (Sell p price) -> return (addBid bid book)
 
-    (NewSell person oldPrice newPrice) ->         
+    (NewSell person oldPrice newPrice) ->
         let newSellbid = Sell person newPrice
             oldSellbid = Sell person oldPrice
             newOrderBook = addBid newSellbid (deleteBid oldSellbid book)
         in return newOrderBook
 
-        
+
 execute bid book@(buybids, Empty) = case bid of
     (Sell p price)  -> case root buybids of
         Just (Buy p biddingPrice) -> if price <= biddingPrice
@@ -143,7 +183,7 @@ execute bid book@(buybids, Empty) = case bid of
 
     (Buy p price) -> return (addBid bid book)
 
-    (NewBuy person oldPrice newPrice) ->         
+    (NewBuy person oldPrice newPrice) ->
         let newBuybid = Buy person newPrice
             oldBuybid = Buy person oldPrice
             newOrderBook = addBid newBuybid (deleteBid oldBuybid book)
@@ -199,7 +239,7 @@ book :: OrderBook
 book = (h1, h2)
 
 bids :: [Bid]
-bids = [Buy "Aguy" 100, Sell "Someguy" 200, NewBuy "Didrik" 70 75]
+bids = [Sell "A" 100, Sell "B" 200]
 
 buyBid1, buyBid2, buyBid3, buyBid4 :: Bid
 buyBid1 = Buy "Didrik" 70
