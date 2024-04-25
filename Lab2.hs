@@ -121,7 +121,7 @@ doBuyBid buybid book =
         where
             lowestsellbid = case root (snd book) of 
                 Just bid -> bid
-                _ -> buybid
+                _        -> buybid
 
 -- checks if the seller can sell a stock, if so it prints a message and returns the orderbook without the corresponding buy id
 doSellBid :: Bid -> OrderBook -> IO OrderBook
@@ -134,7 +134,7 @@ doSellBid sellbid book =
         where
             highestbuybid = case root (fst book) of 
                 Just bid -> bid
-                _ -> sellbid
+                _        -> sellbid
 
 -- removes the old bid and then runs doBuyBid for the new bid.
 doNewBuyBid :: Bid -> OrderBook -> IO OrderBook
