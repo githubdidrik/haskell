@@ -3,7 +3,6 @@ import Skew
 import Control.Applicative
 import System.Environment
 import System.IO
-
 import Test.QuickCheck
 
 -- | Bids.
@@ -13,7 +12,7 @@ data Bid
   | Sell Person Price          -- Person offers to sell share
   | NewBuy Person Price Price  -- Person changes buy bid
   | NewSell Person Price Price -- Person changes sell bid
-
+  deriving (Eq)
 type Person = String
 type Price = Integer
 
@@ -68,10 +67,10 @@ main = do
 tradeMain :: [Bid] -> IO ()
 tradeMain = trade emptyOrderBook
 
+type OrderBook = (SkewHeap Bid, SkewHeap Bid)
+
 emptyOrderBook :: OrderBook
 emptyOrderBook = (Empty, Empty)
-
-type OrderBook = (SkewHeap Bid, SkewHeap Bid)
 
 addBid :: Bid -> OrderBook -> OrderBook
 addBid b (buyheap, sellheap) = case b of
@@ -90,165 +89,64 @@ instance Show Bid where
 instance Ord Bid where
     (Buy _ p1)  <= (Buy _ p2) = p1 <= p2
     (Sell _ p1) <= (Sell _ p2) = p1 >= p2
-    (Buy _ p1) <= (Sell _ p2) = p1 >= p2
+    (Buy _ p1)  <= (Sell _ p2) = p1 >= p2
     (Sell _ p1) <= (Buy _ p2) = p1 <= p2
 
-
-instance Eq Bid where
-    (Buy _ p1)       == (Buy _ p2)       = p1 == p2
-    (Sell _ p1)      == (Sell _ p2)      = p1 == p2
-    (NewBuy _ p1 _)  == (NewBuy _ p2 _)  = p1 == p2
-    (NewSell _ p1 _) == (NewSell _ p2 _) = p1 == p2
-    _                == _                = False
-
-
+-- goes through all the bids and then prints the final orderbook
 trade :: OrderBook -> [Bid] -> IO()
 trade orderBook [] = do
-    putStrLn "\nOrderbok:"
-    putStrLn $ "Säljare: " ++ toString (snd orderBook)
-    putStrLn $ "Köpare: " ++ toString (fst orderBook)
+    putStrLn "Orderbook:"
+    putStrLn $ "Sellers: " ++ toString (snd orderBook)
+    putStrLn $ "Buyers: "  ++ toString (fst orderBook)
 trade orderBook (bid : rest) = do
-    newOrderBook@(buyHeap, sellHeap) <- execute1 bid orderBook
+    newOrderBook@(buyHeap, sellHeap) <- execute bid orderBook
     trade newOrderBook rest
 
+-- matches type of bid to the right helper function
+execute :: Bid -> OrderBook -> IO OrderBook
+execute bid book = case bid of
+    (Buy p pr)          -> doBuyBid bid book
+    (Sell p pr)         -> doSellBid bid book
+    (NewBuy p old new)  -> doNewBuyBid bid book
+    (NewSell p old new) -> doNewSellBid bid book
 
-execute1 :: Bid -> OrderBook -> IO OrderBook
-execute1 bid book = case bid of
-    (Buy p pr) -> doBuyBid bid book
-    (Sell p pr) -> doSellBid bid book
-    (NewBuy p old new) -> doNewBuyBid bid book
-    (NewSell p old new) -> doNewBuyBid bid book
-
-
+-- checks if the buyer can purchase a stock, if so it prints a message and returns the orderbook without the corresponding sell bid. 
 doBuyBid :: Bid -> OrderBook -> IO OrderBook
 doBuyBid buybid book = 
-    if buybid <= lowestsellbid
-    then return (deleteBid lowestsellbid book)
+    if buybid < lowestsellbid
+    then do
+        tradeMessage buybid lowestsellbid
+        return (deleteBid lowestsellbid book)
     else return (addBid buybid book)
         where
             lowestsellbid = case root (snd book) of 
                 Just bid -> bid
-                _ -> Sell "FEL!!!" 100
+                _ -> buybid
 
+-- checks if the seller can sell a stock, if so it prints a message and returns the orderbook without the corresponding buy id
 doSellBid :: Bid -> OrderBook -> IO OrderBook
 doSellBid sellbid book =
-    if sellbid <= highestbuybid
-    then return (deleteBid highestbuybid book)
+    if sellbid < highestbuybid
+    then do
+        tradeMessage highestbuybid sellbid
+        return (deleteBid highestbuybid book)
     else return (addBid sellbid book)
         where
             highestbuybid = case root (fst book) of 
                 Just bid -> bid
-                _ -> Buy "FEL!!!" 100
+                _ -> sellbid
 
+-- removes the old bid and then runs doBuyBid for the new bid.
 doNewBuyBid :: Bid -> OrderBook -> IO OrderBook
-doNewBuyBid (NewBuy person old new) book =
-    return (addBid (Buy person new) deleteBid (Buy person old))
+doNewBuyBid (NewBuy person old new) book = doBuyBid (Buy person new) (deleteBid (Buy person old) book)
 
+-- removes the old bid and then runs doSellBid for the new bid.
 doNewSellBid :: Bid -> OrderBook -> IO OrderBook
-doNewSellBid (NewSell person old new) book =
-    return (addBid (Sell person new) (deleteBid (Sell person old)))
+doNewSellBid (NewSell person old new) book = doSellBid (Sell person new) (deleteBid (Sell person old) book)
 
 
-execute :: Bid -> OrderBook -> IO OrderBook
-execute bid book@(Empty, Empty)    = return (addBid bid book)
+tradeMessage :: Bid -> Bid -> IO()
+tradeMessage (Buy buyer p) (Sell seller _) = do
+    putStrLn $ buyer ++ " buys from " ++ seller ++ " for " ++ show p ++ " kr"
 
-execute bid book@(Empty, sellbids) = case bid of
-    (Buy p price)  -> case root sellbids of
-        Just (Sell p askingPrice) -> if price >= askingPrice
-            then do
-                doTrade bid (Sell p askingPrice)
-                let newOrderBook = deleteBid bid (deleteBid (Sell p askingPrice) book)
-                return newOrderBook
-            else return $ addBid bid book
-        _ -> return book -- borde inte ské
-
-    (Sell p price) -> return (addBid bid book)
-
-    (NewSell person oldPrice newPrice) ->
-        let newSellbid = Sell person newPrice
-            oldSellbid = Sell person oldPrice
-            newOrderBook = addBid newSellbid (deleteBid oldSellbid book)
-        in return newOrderBook
-
-
-execute bid book@(buybids, Empty) = case bid of
-    (Sell p price)  -> case root buybids of
-        Just (Buy p biddingPrice) -> if price <= biddingPrice
-            then do
-                doTrade (Buy p biddingPrice) bid
-                let newOrderBook = deleteBid bid (deleteBid (Buy p biddingPrice) book)
-                return newOrderBook
-            else return $ addBid bid book
-        _ -> return book -- borde inte ské
-
-    (Buy p price) -> return (addBid bid book)
-
-    (NewBuy person oldPrice newPrice) ->
-        let newBuybid = Buy person newPrice
-            oldBuybid = Buy person oldPrice
-            newOrderBook = addBid newBuybid (deleteBid oldBuybid book)
-        in return newOrderBook
-
-
-execute bid book@(buybids, sellbids) = case bid of
-    (Buy p price) -> case root sellbids of
-        Just (Sell p askingPrice) -> if price >= askingPrice
-            then do
-                doTrade bid (Sell p askingPrice)
-                let newOrderBook = deleteBid bid (deleteBid (Sell p askingPrice) book)
-                return newOrderBook
-            else return $ addBid bid book
-        _ -> return book -- borde inte ske
-
-    (Sell _ price) -> case root buybids of
-        Just (Buy p biddingPrice) -> if price <= biddingPrice
-            then do
-                doTrade (Buy p biddingPrice) bid
-                let newOrderBook = deleteBid bid (deleteBid (Buy p biddingPrice) book)
-                return newOrderBook
-            else return $ addBid bid book
-        _ -> return book -- borde inte ské
-
-    (NewBuy person oldPrice newPrice) ->
-        let newBuybid = Buy person newPrice
-            oldBuybid = Buy person oldPrice
-            newOrderBook = addBid newBuybid (deleteBid oldBuybid book)
-        in return newOrderBook
-
-    (NewSell person oldPrice newPrice) ->
-        let newSellbid = Sell person newPrice
-            oldSellbid = Sell person oldPrice
-            newOrderBook = addBid newSellbid (deleteBid oldSellbid book)
-        in return newOrderBook
-
-
-doTrade :: Bid -> Bid -> IO()
-doTrade b@(Buy buyer p) s@(Sell seller _) = do
-    putStrLn $ buyer ++ " buys a share from " ++ seller ++ " for " ++ show p
-
-
-
-
-
-h1 :: SkewHeap Bid -- buybid/decending
-h1 = Node (Node Empty buyBid1 (singleton buyBid2)) buyBid3 (singleton buyBid4)
-h2 :: SkewHeap Bid -- sellbid/ascending
-h2 = Node (Node Empty sellBid1 (singleton sellBid2)) sellBid3 (singleton sellBid4)
-
-book :: OrderBook
-book = (h1, h2)
-
-bids :: [Bid]
-bids = [Sell "A" 100, Sell "B" 200]
-
-buyBid1, buyBid2, buyBid3, buyBid4 :: Bid
-buyBid1 = Buy "Didrik" 70
-buyBid2 = Buy "Gustav" 65
-buyBid3 = Buy "Samuel" 200
-buyBid4 = Buy "Melker" 100
-sellBid1, sellBid2, sellBid3, sellBid4 :: Bid
-sellBid1 = Sell "Josef" 80
-sellBid2 = Sell "Victor" 100
-sellBid3 = Sell "Oliwer" 10
-sellBid4 = Sell "Nils" 50
 
