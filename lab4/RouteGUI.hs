@@ -1,4 +1,4 @@
-{-# OPTIONS_GHC -fno-warn-unused-do-bind #-}
+
 {-|
 Module      : RouteGUI
 Description : Graphical interface for the path finding lab
