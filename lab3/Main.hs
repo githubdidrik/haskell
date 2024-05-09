@@ -7,7 +7,7 @@
 -}
 
 import AATree
-import Data.Char
+import Data.List (foldl')
 
 
 --------------------------------------------------------------------------------
@@ -16,7 +16,7 @@ main :: IO ()
 main = do
   contents <- getContents
 
-  let listOfWords = parse contents []
+  let listOfWords = words contents
   let tree = foldr insert emptyTree listOfWords
   let treeSize      = size tree
   let treeHeight    = height tree
@@ -29,14 +29,11 @@ main = do
   putStrLn $ "Optimal height: " ++ show optimalHeight
   putStrLn $ "Height / Optimal height: " ++ show heightRatio
   putStrLn $ "checkTree: " ++ show correctTree
-  putStrLn $ "First 20 words: " ++ show (take 20 (inorder tree))
+  putStrLn $ "First 20 words: " ++ concatMap addSpace (take 20 (inorder tree))
 
 
-parse :: String -> String -> [String]
-parse "" acc = [acc]
-parse (c:cs) acc
-  | isSpace c = acc : parse cs []
-  | otherwise = parse cs (acc ++ [c])
+addSpace :: String -> String
+addSpace s = s ++ " "
 
 --------------------------------------------------------------------------------
 
