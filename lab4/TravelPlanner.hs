@@ -33,7 +33,7 @@ shortestPath g start end = if end `elem` stops then Just (stops, distance) else 
       distance  = maximum (map (\(Edge _ _ dist) -> dist) (M.keys s))
       --distance  = fromMaybe 0 (M.lookup end s)
 
--- loop through all vertices to find shortest path
+-- loop through all vertices to find shortest path1
 dijkstraLoop :: (Ord a, Ord b, Num b) => Graph a b -> Map (Edge a b) b -> SkewHeap (Edge a b) -> [a] -> (Map (Edge a b) b, SkewHeap (Edge a b))
 dijkstraLoop g s q []       = (s, q)
 dijkstraLoop g s q (v : vs) = dijkstraLoop g newSet newQueue vs
