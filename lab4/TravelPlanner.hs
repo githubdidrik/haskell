@@ -7,10 +7,12 @@ import Graph
 import Skew
 import qualified Data.Map as M
 import Data.Map (Map)
---import Data.List (singleton)
-import qualified Data.Set as S
 import Data.Maybe
-import Control.Monad (when)
+import qualified Data.Set as S
+import Data.List (foldl')
+import Data.Ord (comparing)
+--import Data.PSQueue
+
 
 
 
@@ -21,44 +23,24 @@ graph1 = addEdge "A" "D" 100 $ addEdge "C" "D" 1 $ addEdge "B" "C" 3 $ addEdge "
 graph2 = addEdge "A" "C" 8 $ addEdge "B" "C" 2 $ addEdge "A" "B" 5 $ addEdge "A" "B" 10 $ addEdge "C" "D" 2 $ addEdge "A" "D" 5 $  addEdge "D" "E" 5 $ addVertices ["A", "B", "C", "D", "E"] empty
 graph3 = addEdge "A" "B" 5 $ addEdge "A" "B" 10 $ addVertices ["A", "B", "C"] empty
 
+initQueue :: (Ord a, Ord b, Num b, Ord b) => a -> SkewHeap (b, a, [a])
+initQueue start = singleton (0, start, [])
 
-shortestPath :: (Ord a, Ord b, Num b) => Graph a b -> a -> a -> Maybe ([a], b)
-shortestPath g start end = if end `elem` stops then Just (stops, distance) else Nothing
-    where
-      initSet   = M.empty
-      initQueue = singleton (Edge start start 0)
-      verts     = vertices g
-      (s, q)    = dijkstraLoop g initSet initQueue verts
-      stops = map (\(Edge stop _ _) -> stop) (M.keys s)
-      distance  = maximum (map (\(Edge _ _ dist) -> dist) (M.keys s))
-      --distance  = fromMaybe 0 (M.lookup end s)
-
--- loop through all vertices to find shortest path1
-dijkstraLoop :: (Ord a, Ord b, Num b) => Graph a b -> Map (Edge a b) b -> SkewHeap (Edge a b) -> [a] -> (Map (Edge a b) b, SkewHeap (Edge a b))
-dijkstraLoop g s q []       = (s, q)
-dijkstraLoop g s q (v : vs) = dijkstraLoop g newSet newQueue vs
+shortestPath :: (Ord a, Ord b, Num b, Ord b) => Graph a b ->  a -> a -> Maybe ([a], b)
+shortestPath graph start end = dijkstra (initQueue start) M.empty
   where
-    newSet = M.union s (fst nextStep)
-    newQueue = merge q (snd nextStep)
-    nextStep = dijkstra g s q v
-
--- one loop for dijk algorithm kanske.
--- g: graph, s : map of visted nodes and distances, q : queue of nodes we are going to visit, v :current node/vertice.
-dijkstra :: (Ord a, Ord b, Num b) => Graph a b -> Map (Edge a b) b -> SkewHeap (Edge a b) -> a -> (Map (Edge a b) b, SkewHeap (Edge a b))
-dijkstra g s q v
-  | M.member closest s = (s, delete closest q)
-  | otherwise          = (M.insert closest w s, addEdgesToQueue edges w q)
-  where
-    closest@(Edge _ _ w) = fromMaybe (Edge v v 0) (root q)
-    edges = adj v g
-
-
--- takes the outgoing edges of x and adds them to the queue, adds x weight to every edge.
-addEdgesToQueue :: (Ord a, Ord b, Num b) => [Edge a b] -> b -> SkewHeap (Edge a b) -> SkewHeap (Edge a b)
-addEdgesToQueue [] _ queue                          = queue
-addEdgesToQueue ((Edge x y w) : edges) weight queue = insert (Edge y x (w+weight)) queue
-
-
+    dijkstra queue visited
+      | isEmpty queue            = Nothing
+      | current == end           = Just (reverse (current:path), dist)
+      | M.member current visited = dijkstra restOfQueue visited
+      | otherwise                = dijkstra newQueue newVisited
+      where
+        closest               = fromJust (root queue)
+        (dist, current, path) = closest
+        restOfQueue           = delete closest queue
+        neighbours            = [(dist + label e, dst e, current:path) | e <- adj current graph, M.notMember (dst e) visited]
+        newQueue              = foldr insert restOfQueue neighbours
+        newVisited            = M.insert current dist visited
 
 main :: IO ()
 main = undefined  -- TODO: read arguments, build graph, output shortest path
@@ -69,7 +51,7 @@ startGUI = do
   Right lines <- readLines "your-lines.txt"
   let graph = undefined -- TODO: build your graph here using stops and lines
   runGUI stops lines graph shortestPath
-
+ 
 
 
 

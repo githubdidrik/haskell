@@ -20,7 +20,7 @@ main = do
   let tree = foldr insert emptyTree listOfWords
   let treeSize      = size tree
   let treeHeight    = height tree
-  let optimalHeight = if treeSize <= 1 then 0 else ceiling (logBase 2 (fromIntegral (treeSize + 1))) - 1
+  let optimalHeight = ceiling (logBase 2 (fromIntegral (treeSize + 1))) - 1
   let heightRatio   = fromIntegral treeHeight / fromIntegral optimalHeight
   let correctTree   = checkTree tree
 

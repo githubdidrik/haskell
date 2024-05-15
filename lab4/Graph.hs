@@ -1,5 +1,4 @@
-{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
-{-# HLINT ignore "Use newtype instead of data" #-}
+
 module Graph
   ( -- * Edge
     Edge(..)                    -- type
@@ -27,8 +26,7 @@ data Edge a b = Edge
   } deriving (Show)
 
 -- A graph with nodes of type a and labels of type b.
-data Graph a b = Graph (Map a [Edge a b])
-  deriving (Show)
+data Graph a b = Graph (Map a [Edge a b]) deriving Show
   -- TODO: implement a graph with adjacency lists, hint: use a Map.
 
 instance (Ord a, Ord b) => Ord (Edge a b) where
@@ -45,7 +43,7 @@ empty = Graph M.empty
 addVertex :: Ord a => a -> Graph a b -> Graph a b
 addVertex v (Graph g)
   | M.member v g = Graph g
-  | otherwise = Graph (M.insert v [] g)
+  | otherwise    = Graph (M.insert v [] g)
 
 -- | Add a list of vertices to a graph
 addVertices :: Ord a => [a] -> Graph a b -> Graph a b
@@ -55,17 +53,16 @@ addVertices vs g = foldr addVertex g vs
 -- the second parameter the destination vertex, and the third parameter is the
 -- label (of type b)
 addEdge :: Ord a => a -> a -> b -> Graph a b -> Graph a b
-addEdge v w l (Graph g) = case M.lookup v g of
-  Just edges -> Graph (M.insert v (Edge v w l : edges) g)
-  Nothing    -> Graph g
-
+addEdge v w l (Graph g)
+  | M.member v g && M.member w g = Graph (M.insertWith (++) v [Edge v w l] g)
+  | otherwise                    = Graph g
 
 -- | Add an edge from start to destination, but also from destination to start,
 -- with the same label.
 addBiEdge :: Ord a => a -> a -> b -> Graph a b -> Graph a b
 addBiEdge v w l g = addEdge v w l (addEdge w v l g)
 
--- | Get all adjacent vertices (nodes) for a given node. GET ALL EDGES!!!                                IM EDGING :P
+-- | Get all adjacent vertices (nodes) for a given node. GET ALL EDGES!!!
 adj :: Ord a => a -> Graph a b -> [Edge a b]
 adj v (Graph g) = fromMaybe [] $ M.lookup v g
 
@@ -75,7 +72,7 @@ vertices (Graph g) = M.keys g
 
 -- | Get all edges in a graph
 edges :: Graph a b -> [Edge a b]
-edges (Graph g) = concatMap snd (M.toList g)
+edges (Graph g) = concat (M.elems g)
 
 
 g1 = addBiEdge 1 10 "ettTillTio" (addVertices [1..10] empty)

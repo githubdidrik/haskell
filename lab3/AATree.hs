@@ -75,6 +75,7 @@ size (Node l _ r _) = 1 + size l + size r
 -- returns the hight of the tree.
 height :: AATree a -> Int
 height Empty = 0
+height (Node Empty x Empty _) = 0
 height (Node lt _ rt _) = 1 + max (height lt) (height rt)
 
 -- Check that an AA tree is ordered and obeys the AA invariants

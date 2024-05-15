@@ -6,6 +6,7 @@ module Skew
   , insert -- inserts an element in a heap by merging, therefore O(log n)
   , delete -- searches through the heap for the element, if found it merges the children. the search takes worst case O(n). 
   , toString -- goes through every element in the heap, this takes O(n). for every element it merges its children which takes O(log n). 
+  , isEmpty
   ) where    -- worst case toString is O(n log n). 
 
 data SkewHeap a = Empty | Node (SkewHeap a) a (SkewHeap a) deriving (Show)
@@ -17,7 +18,7 @@ merge :: Ord a => SkewHeap a -> SkewHeap a -> SkewHeap a
 merge Empty h  = h
 merge h Empty  = h
 merge h1@(Node a1 x1 b1) h2@(Node a2 x2 b2)
-    |x1 > x2    = Node (merge h2 b1) x1 a1
+    |x1 < x2    = Node (merge h2 b1) x1 a1
     |otherwise  = Node (merge h1 b2) x2 a2
 
 root :: SkewHeap a -> Maybe a
@@ -32,6 +33,10 @@ delete _ Empty = Empty
 delete x (Node l y r)
     |x == y    = merge l r
     |otherwise = Node (delete x l) y (delete x r)
+
+isEmpty :: SkewHeap a -> Bool
+isEmpty Empty = True
+isEmpty _     = False
 
 {- toString :: (Show a, Ord a) => SkewHeap a -> String
 toString Empty = ""
