@@ -9,8 +9,6 @@ import qualified Data.Map as M
 import Data.Map (Map)
 import Data.Maybe
 import qualified Data.Set as S
-import Data.List (foldl')
-import Data.Ord (comparing)
 --import Data.PSQueue
 
 
