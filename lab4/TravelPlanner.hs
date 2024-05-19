@@ -1,4 +1,7 @@
+{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
+{-# HLINT ignore "Use head" #-}
 {-# LANGUAGE BlockArguments #-}
+
 module Main where
 
 import Route
@@ -9,11 +12,7 @@ import qualified Data.Map as M
 import Data.Map (Map)
 import Data.Maybe
 import qualified Data.Set as S
---import Data.PSQueue
-
-
-
-
+import System.Environment (getArgs)
 
 ------------------------------------------------------------
 
@@ -41,133 +40,32 @@ shortestPath graph start end = dijkstra (initQueue start) M.empty
         newVisited            = M.insert current dist visited
 
 main :: IO ()
-main = undefined  -- TODO: read arguments, build graph, output shortest path
+main = do  -- TODO: read arguments, build graph, output shortest path
+  args <- getArgs
+  let [stopsFile, linesFile, start, end] = args
+  Right stops <- readStops stopsFile
+  Right lines <- readLines linesFile
+
+  let graph = buildGraph stops lines
+      shortest = case shortestPath graph start end of
+        Just (stops, dist) -> unwords stops ++ " with cost " ++ show dist
+        Nothing            -> "aint no way"
+  putStrLn shortest
 
 startGUI :: IO ()
 startGUI = do
-  Right stops <- readStops "your-stops.txt"
-  Right lines <- readLines "your-lines.txt"
-  let graph = undefined -- TODO: build your graph here using stops and lines
+  Right stops <- readStops "stops-gbg.txt"
+  Right lines <- readLines "lines-gbg.txt"
+  let graph = buildGraph stops lines
+  print "slut"
   runGUI stops lines graph shortestPath
- 
 
+buildGraph :: [Stop] -> [LineTable] -> Graph String Integer
+buildGraph stoops lineTables = addLines lineTables (addVertices [name s | s <- stoops] empty)
+  where
+    addLines [] g = g
+    addLines (lineTable : rest) g = addLines rest $ addLine (stops lineTable) g
+      where
+        addLine (ls1 : ls2 : lss) g = addLine (ls2 : lss) (addBiEdge (stopName ls1) (stopName ls2) (time ls2) g)
+        addLine _ g = g
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-{- type DistanceMap a = Map a Int 
-
-
-shortestPath :: Graph a b -> a -> a -> Maybe ([a], b)
-shortestPath g start end = do
-  dist <- dijkstra g start
-  path <- getPath start end dist
-  return (path, fromJust $ M.lookup end dist)
-
-
-dijkstra :: (Ord a, Ord b) => Graph a b -> a -> Maybe (DistanceMap a)
-dijkstra g start = dijkstra' (adjList g) (M.singleton start 0) (M.keysSet $ adjList g)
-
-
-dijkstra' :: (Ord a, Ord b) => Map a [Edge a b] -> DistanceMap a -> S.Set a -> Maybe (DistanceMap a) 
-dijkstra' adjList dists notVisited
-  | M.null notVisited = Just dists
-  | otherwise = do
-    current <- closestVertex dists not
-    let neighbors = M.findWithDefault [] current adjList 
-    let newDists = relaxEdges current neighbors dists
-    let newNotVisited = S.delete current notVisited
-    dijkstra' adjList newDists newNotVisited
-
-closestVertex :: Ord a => DistanceMap a -> S.Set a -> Maybe a 
-closestVertex dists notVisited = S.lookupMin $ S.intersection notVisited (M.keysSet dists)
-
-relaxEdges :: (Ord a, Num b) => a -> [Edge a b] -> DistanceMap a -> DistanceMap a
-relaxEdges src edges dists = foldr  relax dists edges 
-  where 
-    relax (Edge src dst weight) ds = 
-      let newDist = M.findWithDefault maxBound src ds + weight
-      in M.insertWith min dst newDist ds -}
